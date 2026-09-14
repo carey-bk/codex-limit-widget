@@ -223,12 +223,12 @@ private struct TerminalLimitWidgetView: View {
                 .frame(width: max(116, width * 0.42), alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    statRow("PLAN", (snapshot.planType ?? "--").uppercased(), size: 12)
+                    statRow("PLAN", snapshot.planDisplayName, size: 12)
                     statRow("LIMIT", metric.id, size: 12)
                     if let secondary = secondaryMetric(excluding: metric.id) {
                         statRow(secondary.id, "\(secondary.window.leftPercent)%", size: 12)
                     } else {
-                        statRow("USED", "\(metric.window.usedPercent)%", size: 12)
+                        statRow("BANK RESET", snapshot.bankResetText, size: 12)
                     }
                 }
                 .padding(.top, 2)
@@ -294,7 +294,7 @@ private struct TerminalLimitWidgetView: View {
                 Spacer(minLength: 6)
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    compactStat("PLAN", (snapshot.planType ?? "--").uppercased())
+                    compactStat("PLAN", snapshot.planDisplayName)
                     compactStat("LIMIT", metric.id)
                 }
                 .padding(.top, 8)
@@ -361,12 +361,12 @@ private struct TerminalLimitWidgetView: View {
                 .layoutPriority(1)
 
                 VStack(alignment: .leading, spacing: 7) {
-                    statRow("USED", "\(metric.window.usedPercent)%", size: 15)
+                    statRow("BANK RESET", snapshot.bankResetText, size: 15)
                     statRow("LIMIT", metric.id, size: 15)
                     if let secondary = secondaryMetric(excluding: metric.id) {
                         statRow(secondary.id, "\(secondary.window.leftPercent)%", size: 15)
                     }
-                    statRow("PLAN", (snapshot.planType ?? "--").uppercased(), size: 15)
+                    statRow("PLAN", snapshot.planDisplayName, size: 15)
                     if shouldShowStaleWarning(snapshot) {
                         statRow("STALE", "DATA", size: 15)
                     }
@@ -694,9 +694,9 @@ private struct EditorialLimitWidgetView: View {
             }
 
             HStack(spacing: 10) {
-                editorialStat("USED", "\(metric.usedPercent)%")
+                editorialStat("BANK RESET", snapshot.bankResetText)
                 EditorialVerticalRule()
-                editorialStat("PLAN", (snapshot.planType ?? "--").uppercased())
+                editorialStat("PLAN", snapshot.planDisplayName)
             }
 
         }
@@ -756,12 +756,12 @@ private struct EditorialLimitWidgetView: View {
                 .frame(width: leftWidth, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    editorialMediumStatRow("PLAN", (snapshot.planType ?? "--").uppercased())
+                    editorialMediumStatRow("PLAN", snapshot.planDisplayName)
                     editorialMediumStatRow("LIMIT", metricID)
                     if let secondaryMetric {
                         editorialMediumStatRow("WEEKLY", "\(secondaryMetric.leftPercent)%")
                     } else {
-                        editorialMediumStatRow("USED", "\(metric.usedPercent)%")
+                        editorialMediumStatRow("BANK RESET", snapshot.bankResetText)
                     }
                 }
                 .padding(.top, 1)
@@ -825,6 +825,7 @@ private struct EditorialLimitWidgetView: View {
                         .foregroundStyle(EditorialPalette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
+                        .offset(y: -10)
 
                     Text("Remaining")
                         .font(.system(size: 38, weight: .regular, design: .serif))
@@ -838,9 +839,18 @@ private struct EditorialLimitWidgetView: View {
                 EditorialVerticalRule()
                     .frame(height: 106)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("PLAN")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(EditorialPalette.mutedInk)
+                        Text(snapshot.planDisplayName)
+                            .font(.system(size: 24, weight: .regular, design: .serif))
+                            .foregroundStyle(EditorialPalette.ink)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                    }
                     Text(editorialMessage(for: metric.leftPercent))
-                        .font(.system(size: 15, weight: .regular, design: .serif))
+                        .font(.system(size: 13, weight: .regular, design: .serif))
                         .italic()
                         .lineLimit(4)
                         .minimumScaleFactor(0.82)
@@ -850,6 +860,7 @@ private struct EditorialLimitWidgetView: View {
                 }
                 .foregroundStyle(EditorialPalette.mutedInk)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(x: 6, y: 6)
                 .layoutPriority(2)
             }
             .frame(width: contentWidth, alignment: .leading)
@@ -858,28 +869,76 @@ private struct EditorialLimitWidgetView: View {
                 weeklyMeter(weekly.leftPercent, height: 12, labelSize: 12)
             }
 
-            HStack(spacing: 18) {
-                editorialStat("USED", "\(metric.usedPercent)%")
-                if snapshot.fiveHour != nil, let weekly = snapshot.weekly {
-                    EditorialVerticalRule()
-                    editorialStat("WEEKLY", "\(weekly.leftPercent)%")
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 17) {
+                    editorialStat("BANK RESET", snapshot.bankResetText)
+                    editorialStat("PEAK DAY", formatTokenCount(snapshot.usage?.peakDailyTokens))
                 }
-                EditorialVerticalRule()
-                editorialStat("TOKENS", formatTokenCount(snapshot.usage?.lifetimeTokens))
-                EditorialVerticalRule()
-                editorialStat("PLAN", (snapshot.planType ?? "--").uppercased())
-            }
-
-            HStack(spacing: 18) {
-                editorialStat("PEAK DAY", formatTokenCount(snapshot.usage?.peakDailyTokens))
-                EditorialVerticalRule()
-                editorialStat("LAST DAY", formatTokenCount(snapshot.usage?.lastDailyTokens))
-                EditorialVerticalRule()
-                editorialStat("STREAK", streakText(snapshot.usage))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(y: 10)
+                EditorialVerticalRule().frame(height: 115)
+                VStack(alignment: .leading, spacing: 17) {
+                    editorialStat("TOTAL TOKENS", formatTokenCount(snapshot.usage?.lifetimeTokens))
+                    editorialStat(snapshot.usage?.latestDayLabel ?? "LAST DAY", formatTokenCount(snapshot.usage?.lastDailyTokens))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(y: 10)
+                sevenDayChart(snapshot.usage)
+                    .padding(.leading, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(padding)
         .frame(width: size.width, height: size.height, alignment: .topLeading)
+    }
+
+    private func sevenDayChart(_ usage: AccountUsageSnapshot?) -> some View {
+        let days = usage?.sevenDayTokens ?? []
+        let maximum = max(1, days.compactMap(\.tokens).max() ?? 1)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("7D TOKENS")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(EditorialPalette.mutedInk)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Text(days.isEmpty ? "--" : "MAX " + formatTokenCount(maximum))
+                .font(.system(size: 8, weight: .regular))
+                .foregroundStyle(EditorialPalette.mutedInk)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            GeometryReader { geometry in
+                ZStack(alignment: .bottom) {
+                    VStack {
+                        Rectangle().fill(EditorialPalette.rule.opacity(0.4)).frame(height: 0.5)
+                        Spacer()
+                        Rectangle().fill(EditorialPalette.rule.opacity(0.4)).frame(height: 0.5)
+                        Spacer()
+                        Rectangle().fill(EditorialPalette.rule).frame(height: 0.5)
+                    }
+                    HStack(alignment: .bottom, spacing: 3) {
+                        ForEach(days.indices, id: \.self) { index in
+                            let day = days[index]
+                            if let tokens = day.tokens {
+                                RoundedRectangle(cornerRadius: 1.5)
+                                    .fill(EditorialPalette.ink.opacity(index == days.count - 1 ? 0.85 : 0.45))
+                                    .frame(height: tokens > 0 ? max(2, geometry.size.height * CGFloat(tokens) / CGFloat(maximum)) : 0.5)
+                                    .frame(maxWidth: .infinity)
+                                    .accessibilityLabel("\(day.date): \(tokens) tokens")
+                            } else {
+                                Text("–").font(.system(size: 8))
+                                    .frame(maxWidth: .infinity)
+                                    .accessibilityLabel("\(day.date): unavailable")
+                            }
+                        }
+                    }
+                }
+            }.frame(height: 62)
+            HStack(spacing: 0) {
+                Text(days.first.map { String($0.date.suffix(5)).replacingOccurrences(of: "-", with: "/") } ?? "--")
+                Spacer(minLength: 0)
+                Text(days.last.map { String($0.date.suffix(5)).replacingOccurrences(of: "-", with: "/") } ?? "--")
+            }
+            .font(.system(size: 8))
+            .foregroundStyle(EditorialPalette.mutedInk)
+        }
     }
 
     private func emptyState(size: CGSize) -> some View {
@@ -1120,7 +1179,7 @@ private extension LimitWindowSnapshot {
         guard let resetsAt else { return "--" }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "HH:mm"
+        formatter.dateFormat = Calendar.current.component(.year, from: resetsAt) == Calendar.current.component(.year, from: Date()) ? "MM/dd HH:mm" : "yyyy/MM/dd HH:mm"
         return formatter.string(from: resetsAt)
     }
 

@@ -77,6 +77,8 @@ final class LimitViewModel: ObservableObject {
             if fresh.usage == nil {
                 fresh.usage = snapshot?.usage
             }
+            fresh.bankResetCount = await BankResetClient.fetch()
+            fresh.bankResetUpdatedAt = fresh.bankResetCount == nil ? nil : Date()
             normalizeCompactMenuBarMetric(for: fresh)
             snapshot = fresh
             try? LimitStore.write(fresh)

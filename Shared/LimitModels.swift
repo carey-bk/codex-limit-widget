@@ -23,6 +23,25 @@ struct LimitSnapshot: Codable, Equatable {
     var fiveHour: LimitWindowSnapshot?
     var weekly: LimitWindowSnapshot?
     var credits: CreditsSnapshot?
+    var bankResetCount: Int? = nil
+    var bankResetUpdatedAt: Date? = nil
+    var bankResetText: String {
+        guard let count = bankResetCount, let date = bankResetUpdatedAt,
+              Date().timeIntervalSince(date) < 300 else { return "--" }
+        return String(count)
+    }
+    var planDisplayName: String {
+        switch planType?.lowercased().replacingOccurrences(of: "_", with: "") {
+        case "prolite": return "Pro 5x"
+        case "pro": return "Pro 20x"
+        case "plus": return "Plus"
+        case "free": return "Free"
+        case "team": return "Team"
+        case "business": return "Business"
+        case "enterprise": return "Enterprise"
+        default: return planType ?? "--"
+        }
+    }
     var planType: String?
     var usage: AccountUsageSnapshot?
     var updatedAt: Date
@@ -156,7 +175,34 @@ struct LimitWindowSnapshot: Codable, Equatable {
     }
 }
 
+struct DailyTokenUsage: Codable, Equatable {
+    var date: String
+    var tokens: Int64?
+}
+
 struct AccountUsageSnapshot: Codable, Equatable {
+    var dailyTokens: [DailyTokenUsage]? = nil
+    var latestDayLabel: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return lastDailyDate == formatter.string(from: Date()) ? "TODAY" : "LAST DAY"
+    }
+    var sevenDayTokens: [DailyTokenUsage] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let latest = dailyTokens?.map(\.date).max(), let end = formatter.date(from: latest) else { return [] }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return (-6...0).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: end) else { return nil }
+            let key = formatter.string(from: date)
+            return DailyTokenUsage(date: key, tokens: dailyTokens?.last(where: { $0.date == key })?.tokens)
+        }
+    }
+
     var lifetimeTokens: Int64?
     var peakDailyTokens: Int64?
     var longestRunningTurnSec: Int64?

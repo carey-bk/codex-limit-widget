@@ -604,6 +604,7 @@ private struct AccountUsageResult: Decodable {
         let lastBucket = dailyUsageBuckets?.sorted { $0.startDate < $1.startDate }.last
 
         return AccountUsageSnapshot(
+            dailyTokens: dailyUsageBuckets?.map { DailyTokenUsage(date: $0.startDate, tokens: $0.tokens) },
             lifetimeTokens: summary.lifetimeTokens,
             peakDailyTokens: summary.peakDailyTokens,
             longestRunningTurnSec: summary.longestRunningTurnSec,
@@ -670,4 +671,41 @@ private struct AccountUsageSummaryDTO: Decodable {
 private struct AccountUsageDailyBucketDTO: Decodable {
     var startDate: String
     var tokens: Int64
+}
+
+// Read-only banked reset lookup. Credentials stay in memory; widgets only receive the count.
+enum BankResetClient {
+    static func fetch() async -> Int? {
+        let home = ProcessInfo.processInfo.environment["CODEX_HOME"]
+            .map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex")
+        guard let data = try? Data(contentsOf: home.appendingPathComponent("auth.json")),
+              let auth = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tokens = auth["tokens"] as? [String: Any],
+              let token = (tokens["access_token"] ?? tokens["accessToken"]) as? String else { return nil }
+        var account = (tokens["account_id"] ?? tokens["accountId"]) as? String
+        let parts = token.split(separator: ".")
+        if parts.count > 1 {
+            var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+            if let decoded = Data(base64Encoded: payload),
+               let claims = try? JSONSerialization.jsonObject(with: decoded) as? [String: Any],
+               let details = claims["https://api.openai.com/auth"] as? [String: Any],
+               let id = details["chatgpt_account_id"] as? String { account = id }
+        }
+        var request = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!)
+        request.timeoutInterval = 15
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+        request.setValue(account, forHTTPHeaderField: "ChatGPT-Account-Id")
+        request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
+        request.setValue("CODEX", forHTTPHeaderField: "OAI-Product-Sku")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (body, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let result = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
+        if let count = (result["available_count"] ?? result["availableCount"]) as? Int, count >= 0 { return count }
+        guard let credits = result["credits"] as? [[String: Any]] else { return nil }
+        return credits.filter { ($0["status"] as? String)?.lowercased() == "available" }.count
+    }
 }

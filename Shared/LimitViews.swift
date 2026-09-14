@@ -141,7 +141,7 @@ private struct TerminalSnapshotDetailView: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         if let planType = snapshot.planType {
-                            Text("Plan: \(planType)")
+                            Text("Plan: \(snapshot.planDisplayName)")
                         }
                         if snapshot.isStale {
                             Text("Data is older than 5 minutes")
@@ -253,7 +253,7 @@ private struct EditorialSnapshotDetailView: View {
 
                         VStack(alignment: .trailing, spacing: 4) {
                             editorialCompactStat(metricResetLabel, metric.resetText)
-                            editorialCompactStat("PLAN", (snapshot.planType ?? "--").uppercased())
+                            editorialCompactStat("PLAN", snapshot.planDisplayName)
                         }
                         .padding(.top, 5)
                     }
@@ -264,7 +264,7 @@ private struct EditorialSnapshotDetailView: View {
                     }
 
                     HStack(spacing: 10) {
-                        editorialCompactStat("USED", "\(metric.usedPercent)%")
+                        editorialCompactStat("BANK RESET", snapshot.bankResetText)
                         if let weekly = snapshot.weekly, snapshot.fiveHour != nil {
                             EditorialPopupVerticalRule()
                             editorialCompactStat("WEEKLY", "\(weekly.leftPercent)%")
